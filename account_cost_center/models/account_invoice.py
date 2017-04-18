@@ -3,7 +3,6 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
 from lxml import etree
-
 from odoo import api, fields, models
 
 
@@ -39,12 +38,12 @@ class AccountInvoice(models.Model):
                 extra_ctx = "'cost_center_default': 1, " \
                     "'cost_center_id': cost_center_id"
                 for el in invoice_line:
-                    ctx = el.get('context')
-                    if ctx:
+                    ctx = "{" + extra_ctx + "}"
+                    if el.get('context'):
+                        ctx = el.get('context')
                         ctx_strip = ctx.rstrip("}").strip().rstrip(",")
                         ctx = ctx_strip + ", " + extra_ctx + "}"
-                    else:
-                        ctx = "{" + extra_ctx + "}"
+
                     el.set('context', str(ctx))
                     res['arch'] = etree.tostring(view_obj)
         return res
@@ -53,9 +52,10 @@ class AccountInvoice(models.Model):
     def invoice_line_move_line_get(self):
         res = super(AccountInvoice, self).invoice_line_move_line_get()
 
-        InvoiceLine = self.env['account.invoice.line']
-        for move_line_dict in res:
-            line = InvoiceLine.browse(move_line_dict['invl_id'])
-            move_line_dict['cost_center_id'] = line.cost_center_id.id
+        for dict_data in res:
+            invl_id = dict_data.get('invl_id')
+            line = self.env['account.invoice.line'].browse(invl_id)
+            if line.cost_center_id:
+                dict_data['cost_center_id'] = line.cost_center_id.id
 
         return res

@@ -130,6 +130,35 @@ class AccountInvoiceLine(models.Model):
             }
         return view
 
+    @api.model
+    def _get_years(self, fy_dates):
+        fy_date_start = datetime.strptime(
+            fy_dates['date_from'].strftime('%Y-%m-%d'), '%Y-%m-%d')
+        fy_year_start = int(fy_dates['date_from'].strftime('%Y-%m-%d')[:4])
+        fy_date_stop = datetime.strptime(
+            fy_dates['date_to'].strftime('%Y-%m-%d'), '%Y-%m-%d')
+        fy_year_stop = int(fy_dates['date_to'].strftime('%Y-%m-%d')[:4])
+        year = fy_year_start
+        cnt = fy_year_stop - fy_year_start + 1
+        factor = 0
+        for i in range(cnt):
+            cy_days = calendar.isleap(year) and 366 or 365
+            if i == 0:  # first year
+                if fy_date_stop.year == year:
+                    duration = (fy_date_stop - fy_date_start).days + 1
+                else:
+                    duration = (datetime(year, 12, 31) -
+                                fy_date_start).days + 1
+                factor = float(duration) / cy_days
+            elif i == cnt - 1:  # last year
+                duration = fy_date_stop - datetime(year, 1, 1)
+                duration_days = duration.days + 1
+                factor += float(duration_days) / cy_days
+            else:
+                factor += 1.0
+            year += 1
+        return factor
+
     @api.multi
     def _get_fy_duration(self, invoice_date, option='days'):
         """
@@ -140,34 +169,6 @@ class AccountInvoiceLine(models.Model):
                   a started month is counted as a full month
         - years: duration in calendar years, considering also leap years
         """
-
-        def get_years(fy_dates):
-            fy_date_start = datetime.strptime(
-                fy_dates['date_from'].strftime('%Y-%m-%d'), '%Y-%m-%d')
-            fy_year_start = int(fy_dates['date_from'].strftime('%Y-%m-%d')[:4])
-            fy_date_stop = datetime.strptime(
-                fy_dates['date_to'].strftime('%Y-%m-%d'), '%Y-%m-%d')
-            fy_year_stop = int(fy_dates['date_to'].strftime('%Y-%m-%d')[:4])
-            year = fy_year_start
-            cnt = fy_year_stop - fy_year_start + 1
-            factor = 0
-            for i in range(cnt):
-                cy_days = calendar.isleap(year) and 366 or 365
-                if i == 0:  # first year
-                    if fy_date_stop.year == year:
-                        duration = (fy_date_stop - fy_date_start).days + 1
-                    else:
-                        duration = (datetime(year, 12, 31) -
-                                    fy_date_start).days + 1
-                    factor = float(duration) / cy_days
-                elif i == cnt - 1:  # last year
-                    duration = fy_date_stop - datetime(year, 1, 1)
-                    duration_days = duration.days + 1
-                    factor += float(duration_days) / cy_days
-                else:
-                    factor += 1.0
-                year += 1
-            return factor
 
         def get_months(fy_dates):
             months = (int(fy_dates['date_to'].strftime('%Y-%m-%d')[:4]) -
@@ -195,7 +196,7 @@ class AccountInvoiceLine(models.Model):
             months = get_months(fy_dates)
             return months
         elif option == 'years':
-            factor = get_years(fy_dates)
+            factor = self._get_years(fy_dates)
             return factor
 
     @api.multi
@@ -447,34 +448,34 @@ class AccountInvoiceLine(models.Model):
         self.ensure_one()
         return (self.name or str(self.id)) + '/' + str(seq)
 
+    @api.model
+    def _internal_compute_spread_board_lines(self, spread_start_date, table):
+        lines = table[0]['lines']
+        lines1 = []
+        lines2 = []
+        if lines:
+
+            for line in lines:
+                flag = line['date'] < spread_start_date
+                if flag:
+                    lines1.append(line)
+                else:
+                    lines2.append(line)
+        if lines1:
+            def group_lines(x, y):
+                y.update({'amount': x['amount'] + y['amount']})
+                return y
+
+            lines1 = [reduce(group_lines, lines1)]
+            lines1[0]['spreaded_value'] = 0.0
+        return lines1 + lines2
+
     @api.multi
     def _compute_spread_board(self):
         self.ensure_one()
 
         def get_format_date(date):
             return datetime.strptime(date, '%Y-%m-%d').date()
-
-        def compute_lines(spread_start_date, table):
-            lines = table[0]['lines']
-            lines1 = []
-            lines2 = []
-            if lines:
-                flag = lines[0]['date'] < spread_start_date
-                for line in lines:
-                    if flag:
-                        lines1.append(line)
-                        if line['date'] >= spread_start_date:
-                            flag = False
-                    else:
-                        lines2.append(line)
-            if lines1:
-                def group_lines(x, y):
-                    y.update({'amount': x['amount'] + y['amount']})
-                    return y
-
-                lines1 = [reduce(group_lines, lines1)]
-                lines1[0]['spreaded_value'] = 0.0
-            return lines1 + lines2
 
         def get_spread_line_id(last_spread_line):
             return last_spread_line and last_spread_line.id
@@ -494,7 +495,8 @@ class AccountInvoiceLine(models.Model):
 
             # group lines prior to spread start period
             spread_start_date = get_format_date(self.spread_start_date)
-            total_lines = compute_lines(spread_start_date, table)
+            total_lines = self._internal_compute_spread_board_lines(
+                spread_start_date, table)
             table[0]['lines'] = total_lines
 
             # check table with posted entries and
