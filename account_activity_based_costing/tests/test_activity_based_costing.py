@@ -135,15 +135,15 @@ class TestActivityBasedCosting(common.TransactionCase):
         self.assertEqual(self.aa_3.expected_contribution_perc, 0.0)
 
     def test_03_get_realized_data(self):
-        self.assertEqual(self.aa_1.realized_turnover, 1000.0)
-        self.assertEqual(self.aa_1.realized_costs, 500.0)
+        self.assertEqual(self.aa_1.realized_turnover, 0.0)
+        self.assertEqual(self.aa_1.realized_costs, -500.0)
         self.assertEqual(self.aa_1.contribution, 500.0)
-        self.assertEqual(self.aa_1.contribution_perc, 50.0)
+        self.assertEqual(self.aa_1.contribution_perc, 0.0)
 
-        self.assertEqual(self.aa_2.realized_turnover, 1000.0)
-        self.assertEqual(self.aa_2.realized_costs, 2000.0)
+        self.assertEqual(self.aa_2.realized_turnover, 0.0)
+        self.assertEqual(self.aa_2.realized_costs, 1000.0)
         self.assertEqual(self.aa_2.contribution, -1000.0)
-        self.assertEqual(self.aa_2.contribution_perc, -100.0)
+        self.assertEqual(self.aa_2.contribution_perc, 0.0)
 
         self.assertEqual(self.aa_3.realized_turnover, 0.0)
         self.assertEqual(self.aa_3.realized_costs, 3000.0)
@@ -151,13 +151,13 @@ class TestActivityBasedCosting(common.TransactionCase):
         self.assertEqual(self.aa_3.contribution_perc, 0.0)
 
     def test_04_get_budget_result(self):
-        self.assertEqual(self.aa_1.budget_result_turnover, 0.0)
-        self.assertEqual(self.aa_1.budget_result_cost, 0.0)
+        self.assertEqual(self.aa_1.budget_result_turnover, -1000.0)
+        self.assertEqual(self.aa_1.budget_result_cost, 1000.0)
         self.assertEqual(self.aa_1.budget_result_contribution, 0.0)
         self.assertEqual(self.aa_1.budget_result_contribution_perc, 0.0)
 
-        self.assertEqual(self.aa_2.budget_result_turnover, 1000.0)
-        self.assertEqual(self.aa_2.budget_result_cost, -1500.0)
+        self.assertEqual(self.aa_2.budget_result_turnover, 0.0)
+        self.assertEqual(self.aa_2.budget_result_cost, -500.0)
         self.assertEqual(self.aa_2.budget_result_contribution, -500.0)
         self.assertEqual(self.aa_2.budget_result_contribution_perc, 100.0)
 
